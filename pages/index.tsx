@@ -4,12 +4,45 @@ import { useState } from "react";
 import styles from "../styles/Home.module.css";
 
 export default function Home() {
-  const [resultState, setResultState] = useState("initial value");
+  const [resultState, setResultState] = useState("initial result");
+  const [inputState, setInputState] = useState("initial input...");
+
+  const [haveMadeCall, setHaveMadeCall] = useState(false);
+  const [inputSuccess, setInputSuccess] = useState(false);
+
+  const handleSubmitInput = async (): Promise<void> => {
+    setHaveMadeCall(false);
+
+    let response: Response | undefined;
+    try {
+      response = await fetch("/send/user/input", {
+        method: "POST",
+        body: JSON.stringify(inputState),
+      });
+    } catch (err) {
+      setHaveMadeCall(true);
+      setInputSuccess(false);
+      if (err instanceof Error) {
+        console.error(err.message);
+      } else if (typeof err === "string") {
+        console.error(err);
+      } else {
+        throw err;
+      }
+    }
+    setHaveMadeCall(true);
+    if (response instanceof Response) {
+      setInputSuccess(response.ok);
+    } else {
+      setInputSuccess(false);
+      throw new TypeError(`wtf:\n${JSON.stringify(response)}`);
+    }
+  };
 
   const handleGetResult = async (): Promise<void> => {
     let response: Response | undefined;
     try {
-      response = await fetch("/mocked/path");
+      response = await fetch("/execute/user/input");
     } catch (err) {
       if (err instanceof Error) {
         console.error(err.message);
@@ -20,7 +53,7 @@ export default function Home() {
       }
     }
     if (response instanceof Response) {
-      const responseJson = response.json();
+      const responseJson = await response.json();
       const responseString = JSON.stringify(responseJson);
       setResultState(responseString);
     } else {
@@ -48,6 +81,33 @@ export default function Home() {
 
         <div className={styles.grid}>
           <div className={styles.card}>
+            <form
+              onSubmit={(ev) => {
+                ev.preventDefault();
+                handleSubmitInput();
+              }}
+            >
+              <label htmlFor="user-input">
+                <h2>Input Something</h2>
+              </label>
+              <input
+                id="story"
+                name="user-input"
+                value={inputState}
+                onChange={(ev) => {
+                  setInputState(ev.target.value);
+                }}
+                className={styles.input}
+              ></input>
+              <button type="submit" className={styles.button}>
+                Set Input
+              </button>
+            </form>
+            {haveMadeCall && (
+              <p>{inputSuccess ? "Success!" : "Error, see console"}</p>
+            )}
+          </div>
+          <div className={styles.card}>
             <h2>Get Your Result</h2>
             <button
               type="button"
@@ -56,7 +116,7 @@ export default function Home() {
             >
               Get Result
             </button>
-            <code className={styles.code}>{resultState}</code>
+            <p className={styles.result}>{resultState}</p>
           </div>
         </div>
       </main>
