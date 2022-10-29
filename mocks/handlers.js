@@ -1,12 +1,24 @@
 // src/mocks/handlers.js
 import { rest } from "msw";
 
+const EXTRACTION_KEY_KEY = "extractionKey";
+
+// Server-side code;
+let serverSideFunction;
+
 export const handlers = [
-  rest.post("/send/user/input", async (req, res, ctx) => {
+  rest.post("/server/update", async (req, res, ctx) => {
     const userInput = await req.json();
 
-    // Persist data
-    sessionStorage.setItem("user-input", JSON.stringify(userInput));
+    // Update server side code;
+    try {
+      serverSideFunction = Function(userInput);
+    } catch (err) {
+      return res(ctx.status(500), ctx.json({ error: err.message }));
+    }
+
+    // // Persist data
+    // sessionStorage.setItem("user-input", JSON.stringify(userInput));
 
     return res(
       // Respond with a 200 status code
@@ -14,26 +26,52 @@ export const handlers = [
     );
   }),
 
-  rest.get("/execute/user/input", async (req, res, ctx) => {
-    // Check if the user is authenticated in this session
-    const rawUserInput = sessionStorage.getItem("user-input");
-    const userInput = JSON.parse(rawUserInput);
+  rest.get("/server/execute", async (req, res, ctx) => {
+    // // Get persisted data.
+    // const rawServerInput = sessionStorage.getItem("user-input");
 
-    if (!userInput) {
-      // If not authenticated, respond with a 403 error
+    // Check the server-side code has been updated by the user.
+    if (!serverSideFunction) {
       return res(
         ctx.status(200),
         ctx.json({
-          warning: "No user input stored",
+          warning: "No user inputted code on server, please 'Update Server'",
         })
       );
     }
 
-    // If authenticated, return a mocked user details
+    const searchParams = req.url.searchParams;
+    const rawExtractionKey = searchParams.get(EXTRACTION_KEY_KEY);
+
+    // Debug
+    console.log("server side");
+    console.log("extractionKey", rawExtractionKey);
+
+    if (!rawExtractionKey) {
+      return res(
+        ctx.status(200),
+        ctx.json({
+          warning: "Please make sure you specify and '{extractionKey: ...}'",
+        })
+      );
+    }
+    const extractionKey = decodeURIComponent(rawExtractionKey);
+    const serverData = serverSideFunction();
+    const extractedValue = serverData[extractionKey];
+
+    if (!extractedValue) {
+      return res(
+        ctx.status(200),
+        ctx.json({
+          warning: `Could not find values for key: "${extractionKey}"`,
+        })
+      );
+    }
+
     return res(
       ctx.status(200),
       ctx.json({
-        userInput,
+        result: extractedValue,
       })
     );
   }),
